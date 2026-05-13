@@ -1,7 +1,7 @@
 ---
 tracker:
   kind: linear
-  project_slug: "symphony-0c79b11b75ea"
+  project_slug: "new-shiny-webapp-45f3f4980001"
   active_states:
     - Todo
     - In Progress

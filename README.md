@@ -3,6 +3,14 @@
 Symphony turns project work into isolated, autonomous implementation runs, allowing teams to manage
 work instead of supervising coding agents.
 
+## JIRA Integration
+
+This Symphony instance is configured to use JIRA as the project tracker. The workflow is set up to pick up tickets that are in the "In Progress" state and assigned to Suren Sampath.
+
+To adjust JIRA settings, edit the `elixir/WORKFLOW_jira.md` file.
+
+[See workflow example](elixir/WORKFLOW_jira.md)
+
 [![Symphony demo video preview](.github/media/symphony-demo-poster.jpg)](.github/media/symphony-demo.mp4)
 
 _In this [demo video](.github/media/symphony-demo.mp4), Symphony monitors a Linear board for work and spawns agents to handle the tasks. The agents complete the tasks and provide proof of work: CI status, PR review feedback, complexity analysis, and walkthrough videos. When accepted, the agents land the PR safely. Engineers do not need to supervise Codex; they can manage the work at a higher level._
@@ -39,3 +47,6 @@ help with the setup:
 ## License
 
 This project is licensed under the [Apache License 2.0](LICENSE).
+
+
+![alt text](image.png)

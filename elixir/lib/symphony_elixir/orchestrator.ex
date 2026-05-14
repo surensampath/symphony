@@ -196,8 +196,16 @@ defmodule SymphonyElixir.Orchestrator do
           |> apply_codex_token_delta(token_delta)
           |> apply_codex_rate_limits(update)
 
+        # Increment global codex_totals for dashboard
+        codex_totals = state.codex_totals || %{input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_running: 0}
+        new_codex_totals = %{
+          input_tokens: codex_totals.input_tokens + (token_delta.input_tokens || 0),
+          output_tokens: codex_totals.output_tokens + (token_delta.output_tokens || 0),
+          total_tokens: codex_totals.total_tokens + (token_delta.total_tokens || 0),
+          seconds_running: codex_totals.seconds_running
+        }
         notify_dashboard()
-        {:noreply, %{state | running: Map.put(running, issue_id, updated_running_entry)}}
+        {:noreply, %{state | running: Map.put(running, issue_id, updated_running_entry), codex_totals: new_codex_totals}}
     end
   end
 

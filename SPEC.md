@@ -137,7 +137,7 @@ Symphony is easiest to port when kept in these layers:
 
 ### 3.3 External Dependencies
 
-- Issue tracker API (Linear for `tracker.kind: linear` in this specification version).
+- Issue tracker API (Linear for `tracker.kind: linear`; Jira for `tracker.kind: jira`).
 - Local filesystem for workspaces and logs.
 - OPTIONAL workspace population tooling (for example Git CLI, if used).
 - Coding-agent executable that supports the targeted Codex app-server mode.
@@ -349,15 +349,20 @@ Fields:
 
 - `kind` (string)
   - REQUIRED for dispatch.
-  - Current supported value: `linear`
+  - Current supported values: `linear`, `jira`
 - `endpoint` (string)
   - Default for `tracker.kind == "linear"`: `https://api.linear.app/graphql`
+  - REQUIRED for `tracker.kind == "jira"` and points to the Jira site root.
 - `api_key` (string)
   - MAY be a literal token or `$VAR_NAME`.
   - Canonical environment variable for `tracker.kind == "linear"`: `LINEAR_API_KEY`.
+  - Canonical environment variables for `tracker.kind == "jira"`: `JIRA_API_TOKEN`,
+    then `JIRA_PERSONAL_TOKEN`.
   - If `$VAR_NAME` resolves to an empty string, treat the key as missing.
 - `project_slug` (string)
   - REQUIRED for dispatch when `tracker.kind == "linear"`.
+- `project_key` (string)
+  - REQUIRED for dispatch when `tracker.kind == "jira"`.
 - `active_states` (list of strings)
   - Default: `Todo`, `In Progress`
 - `terminal_states` (list of strings)
@@ -570,10 +575,12 @@ This section is intentionally redundant so a coding agent can implement the conf
 Extension fields are documented in the extension section that defines them. Core conformance does
 not require recognizing or validating extension fields unless that extension is implemented.
 
-- `tracker.kind`: string, REQUIRED, currently `linear`
+- `tracker.kind`: string, REQUIRED, currently `linear` or `jira`
 - `tracker.endpoint`: string, default `https://api.linear.app/graphql` when `tracker.kind=linear`
-- `tracker.api_key`: string or `$VAR`, canonical env `LINEAR_API_KEY` when `tracker.kind=linear`
+- `tracker.api_key`: string or `$VAR`, canonical env `LINEAR_API_KEY` when `tracker.kind=linear`;
+  `JIRA_API_TOKEN` or `JIRA_PERSONAL_TOKEN` when `tracker.kind=jira`
 - `tracker.project_slug`: string, REQUIRED when `tracker.kind=linear`
+- `tracker.project_key`: string, REQUIRED when `tracker.kind=jira`
 - `tracker.active_states`: list of strings, default `["Todo", "In Progress"]`
 - `tracker.terminal_states`: list of strings, default `["Closed", "Cancelled", "Canceled", "Duplicate", "Done"]`
 - `polling.interval_ms`: integer, default `30000`
@@ -1163,6 +1170,21 @@ Important:
 
 - Linear GraphQL schema details can drift. Keep query construction isolated and test the exact query
   fields/types REQUIRED by this specification.
+
+### 11.3 Query Semantics (Jira)
+
+Jira-specific requirements for `tracker.kind == "jira"`:
+
+- `tracker.kind == "jira"`
+- REST endpoint rooted at the configured Jira site, using `/rest/api/2`
+- Auth token sent in the `Authorization` header; literal tokens are sent as `Bearer <token>` unless
+  they already include an auth scheme.
+- `tracker.project_key` maps to Jira `project`.
+- Candidate issue query uses JQL filtering by project and configured active statuses.
+- Issue-state refresh query uses Jira issue keys with `issuekey in (...)`.
+- Pagination REQUIRED for candidate issues.
+- Page size default: `50`.
+- Network timeout: `30000 ms`.
 
 A non-Linear implementation MAY change transport details, but the normalized outputs MUST match the
 domain model in Section 4.

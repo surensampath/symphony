@@ -86,6 +86,45 @@ defmodule SymphonyElixir.CoreTest do
 
     write_workflow_file!(Workflow.workflow_file_path(), tracker_kind: "123")
     assert {:error, {:unsupported_tracker_kind, "123"}} = Config.validate!()
+
+    previous_jira_api_token = System.get_env("JIRA_API_TOKEN")
+    previous_jira_personal_token = System.get_env("JIRA_PERSONAL_TOKEN")
+
+    on_exit(fn ->
+      restore_env("JIRA_API_TOKEN", previous_jira_api_token)
+      restore_env("JIRA_PERSONAL_TOKEN", previous_jira_personal_token)
+    end)
+
+    System.delete_env("JIRA_API_TOKEN")
+    System.delete_env("JIRA_PERSONAL_TOKEN")
+
+    write_workflow_file!(Workflow.workflow_file_path(),
+      tracker_kind: "jira",
+      tracker_api_token: "jira-token",
+      tracker_project_slug: nil,
+      tracker_project_key: "DEML"
+    )
+
+    assert :ok = Config.validate!()
+    assert Config.settings!().tracker.project_key == "DEML"
+
+    write_workflow_file!(Workflow.workflow_file_path(),
+      tracker_kind: "jira",
+      tracker_api_token: nil,
+      tracker_project_slug: nil,
+      tracker_project_key: "DEML"
+    )
+
+    assert {:error, :missing_jira_api_token} = Config.validate!()
+
+    write_workflow_file!(Workflow.workflow_file_path(),
+      tracker_kind: "jira",
+      tracker_api_token: "jira-token",
+      tracker_project_slug: nil,
+      tracker_project_key: nil
+    )
+
+    assert {:error, :missing_jira_project_key} = Config.validate!()
   end
 
   test "current WORKFLOW.md file is valid and complete" do
@@ -147,6 +186,43 @@ defmodule SymphonyElixir.CoreTest do
     )
 
     assert Config.settings!().tracker.assignee == env_assignee
+  end
+
+  test "jira api token resolves from Jira env vars" do
+    previous_jira_api_token = System.get_env("JIRA_API_TOKEN")
+    previous_jira_personal_token = System.get_env("JIRA_PERSONAL_TOKEN")
+
+    on_exit(fn ->
+      restore_env("JIRA_API_TOKEN", previous_jira_api_token)
+      restore_env("JIRA_PERSONAL_TOKEN", previous_jira_personal_token)
+    end)
+
+    System.put_env("JIRA_API_TOKEN", "jira-api-token")
+    System.put_env("JIRA_PERSONAL_TOKEN", "jira-personal-token")
+
+    write_workflow_file!(Workflow.workflow_file_path(),
+      tracker_kind: "jira",
+      tracker_api_token: nil,
+      tracker_project_slug: nil,
+      tracker_project_key: "DEML",
+      codex_command: "/bin/sh app-server"
+    )
+
+    assert Config.settings!().tracker.api_key == "jira-api-token"
+    assert :ok = Config.validate!()
+
+    System.delete_env("JIRA_API_TOKEN")
+
+    write_workflow_file!(Workflow.workflow_file_path(),
+      tracker_kind: "jira",
+      tracker_api_token: nil,
+      tracker_project_slug: nil,
+      tracker_project_key: "DEML",
+      codex_command: "/bin/sh app-server"
+    )
+
+    assert Config.settings!().tracker.api_key == "jira-personal-token"
+    assert :ok = Config.validate!()
   end
 
   test "workflow file path defaults to WORKFLOW.md in the current working directory when app env is unset" do

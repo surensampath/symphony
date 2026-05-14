@@ -107,6 +107,17 @@ You are working on a Linear issue {{ issue.identifier }}.
 Title: {{ issue.title }} Body: {{ issue.description }}
 ```
 
+Jira-backed workflows use the same prompt and orchestration contract, but set `kind: jira` and use
+the Jira project key:
+
+```yaml
+tracker:
+  kind: jira
+  endpoint: "https://jira.example.com"
+  api_key: $JIRA_API_TOKEN
+  project_key: "ABC"
+```
+
 Notes:
 
 - If a value is missing, defaults are used.
@@ -127,7 +138,9 @@ Notes:
   `git clone ... .` there, along with any other setup commands you need.
 - If a hook needs `mise exec` inside a freshly cloned workspace, trust the repo config and fetch
   the project dependencies in `hooks.after_create` before invoking `mise` later from other hooks.
-- `tracker.api_key` reads from `LINEAR_API_KEY` when unset or when value is `$LINEAR_API_KEY`.
+- `tracker.api_key` reads from `LINEAR_API_KEY` for Linear workflows, and from `JIRA_API_TOKEN` or
+  `JIRA_PERSONAL_TOKEN` for Jira workflows, when unset or when the configured `$VAR` resolves
+  through the environment.
 - For path values, `~` is expanded to the home directory.
 - For env-backed path values, use `$VAR`. `workspace.root` resolves `$VAR` before path handling,
   while `codex.command` stays a shell command string and any `$VAR` expansion there happens in the

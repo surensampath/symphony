@@ -672,54 +672,57 @@ defmodule SymphonyElixir.Orchestrator do
   defp dispatch_issue(%State{} = state, issue, attempt \\ nil, preferred_worker_host \\ nil) do
     case revalidate_issue_for_dispatch(issue, &Tracker.fetch_issue_states_by_ids/1, terminal_state_set()) do
       {:ok, %Issue{} = refreshed_issue} ->
-        do_dispatch_issue(state, refreshed_issue, attempt, preferred_worker_host)
-
+        personas = [
+          %{label: "10-year-old beginner"},
+          %{label: "Veteran programmer"},
+          %{label: "Hobbyist UI designer"}
+        ]
+        Enum.reduce(personas, state, fn persona, acc_state ->
+          do_dispatch_issue(acc_state, refreshed_issue, attempt, preferred_worker_host, persona)
+        end)
       {:skip, :missing} ->
         Logger.info("Skipping dispatch; issue no longer active or visible: #{issue_context(issue)}")
         state
-
       {:skip, %Issue{} = refreshed_issue} ->
         Logger.info("Skipping stale dispatch after issue refresh: #{issue_context(refreshed_issue)} state=#{inspect(refreshed_issue.state)} blocked_by=#{length(refreshed_issue.blocked_by)}")
-
         state
-
       {:error, reason} ->
         Logger.warning("Skipping dispatch; issue refresh failed for #{issue_context(issue)}: #{inspect(reason)}")
         state
     end
   end
 
-  defp do_dispatch_issue(%State{} = state, issue, attempt, preferred_worker_host) do
+  defp do_dispatch_issue(%State{} = state, issue, attempt, preferred_worker_host, persona) do
     recipient = self()
-
+    session_id = "#{issue.id}:#{persona.label}"
     case select_worker_host(state, preferred_worker_host) do
       :no_worker_capacity ->
-        Logger.debug("No SSH worker slots available for #{issue_context(issue)} preferred_worker_host=#{inspect(preferred_worker_host)}")
+        Logger.debug("No SSH worker slots available for #{issue_context(issue)} preferred_worker_host=#{inspect(preferred_worker_host)} persona=#{persona.label}")
         state
-
       worker_host ->
-        spawn_issue_on_worker_host(state, issue, attempt, recipient, worker_host)
+        spawn_issue_on_worker_host(state, issue, attempt, recipient, worker_host, persona, session_id)
     end
   end
 
-  defp spawn_issue_on_worker_host(%State{} = state, issue, attempt, recipient, worker_host) do
+  defp spawn_issue_on_worker_host(%State{} = state, issue, attempt, recipient, worker_host, persona, session_id) do
     case Task.Supervisor.start_child(SymphonyElixir.TaskSupervisor, fn ->
-           AgentRunner.run(issue, recipient, attempt: attempt, worker_host: worker_host)
+           AgentRunner.run(issue, recipient, attempt: attempt, worker_host: worker_host, persona: persona)
          end) do
       {:ok, pid} ->
         ref = Process.monitor(pid)
 
-        Logger.info("Dispatching issue to agent: #{issue_context(issue)} pid=#{inspect(pid)} attempt=#{inspect(attempt)} worker_host=#{worker_host || "local"}")
+        Logger.info("Dispatching issue to agent: #{issue_context(issue)} persona=#{persona.label} pid=#{inspect(pid)} attempt=#{inspect(attempt)} worker_host=#{worker_host || "local"}")
 
         running =
-          Map.put(state.running, issue.id, %{
+          Map.put(state.running, session_id, %{
             pid: pid,
             ref: ref,
             identifier: issue.identifier,
             issue: issue,
+            persona: persona.label,
             worker_host: worker_host,
             workspace_path: nil,
-            session_id: nil,
+            session_id: session_id,
             last_codex_message: nil,
             last_codex_timestamp: nil,
             last_codex_event: nil,
@@ -738,15 +741,15 @@ defmodule SymphonyElixir.Orchestrator do
         %{
           state
           | running: running,
-            claimed: MapSet.put(state.claimed, issue.id),
-            retry_attempts: Map.delete(state.retry_attempts, issue.id)
+            claimed: MapSet.put(state.claimed, session_id),
+            retry_attempts: Map.delete(state.retry_attempts, session_id)
         }
 
       {:error, reason} ->
-        Logger.error("Unable to spawn agent for #{issue_context(issue)}: #{inspect(reason)}")
+        Logger.error("Unable to spawn agent for #{issue_context(issue)} persona=#{persona.label}: #{inspect(reason)}")
         next_attempt = if is_integer(attempt), do: attempt + 1, else: nil
 
-        schedule_issue_retry(state, issue.id, next_attempt, %{
+        schedule_issue_retry(state, session_id, next_attempt, %{
           identifier: issue.identifier,
           error: "failed to spawn agent: #{inspect(reason)}",
           worker_host: worker_host

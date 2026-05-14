@@ -1,4 +1,5 @@
 defmodule SymphonyElixirWeb.DashboardLive do
+  @findings_path "/Users/sursam01/code/symphony-workspaces/DEML-1856/persona_dashboard.md"
   @moduledoc """
   Live observability dashboard for Symphony.
   """
@@ -10,10 +11,12 @@ defmodule SymphonyElixirWeb.DashboardLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    findings = load_findings()
     socket =
       socket
       |> assign(:payload, load_payload())
       |> assign(:now, DateTime.utc_now())
+      |> assign(:findings, findings)
 
     if connected?(socket) do
       :ok = ObservabilityPubSub.subscribe()
@@ -31,10 +34,12 @@ defmodule SymphonyElixirWeb.DashboardLive do
 
   @impl true
   def handle_info(:observability_updated, socket) do
+    findings = load_findings()
     {:noreply,
      socket
      |> assign(:payload, load_payload())
-     |> assign(:now, DateTime.utc_now())}
+     |> assign(:now, DateTime.utc_now())
+     |> assign(:findings, findings)}
   end
 
   @impl true
@@ -107,6 +112,26 @@ defmodule SymphonyElixirWeb.DashboardLive do
         </section>
 
         <section class="section-card">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Live Findings</h2>
+              <p class="section-copy">Latest findings from the Symphony runtime (test snapshot).</p>
+            </div>
+          </div>
+          <pre class="code-panel" style="white-space: pre-wrap; background: #222; color: #eee; padding: 1em; border-radius: 6px;">
+            <%= @findings %>
+          </pre>
+        </section>
+        <section class="section-card">
+            defp load_findings do
+              if File.exists?(@findings_path) do
+                File.read!(@findings_path)
+                |> String.replace(~r/^```text|```$/m, "")
+                |> String.trim()
+              else
+                "No findings available."
+              end
+            end
           <div class="section-header">
             <div>
               <h2 class="section-title">Rate limits</h2>
@@ -327,4 +352,14 @@ defmodule SymphonyElixirWeb.DashboardLive do
 
   defp pretty_value(nil), do: "n/a"
   defp pretty_value(value), do: inspect(value, pretty: true, limit: :infinity)
+
+  defp load_findings do
+    if File.exists?(@findings_path) do
+      File.read!(@findings_path)
+      |> String.replace(~r/^```text|```$/m, "")
+      |> String.trim()
+    else
+      "No findings available."
+    end
+  end
 end

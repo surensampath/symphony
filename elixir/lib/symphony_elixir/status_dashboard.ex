@@ -612,6 +612,9 @@ defmodule SymphonyElixir.StatusDashboard do
 
     tokens = format_count(total_tokens) |> format_cell(@running_tokens_width, :right)
 
+    persona = Map.get(running_entry, :persona, "n/a")
+    persona_display = format_cell(persona, 18)
+
     status_color =
       case event do
         :none -> @ansi_red
@@ -636,6 +639,8 @@ defmodule SymphonyElixir.StatusDashboard do
       colorize(tokens, @ansi_yellow),
       " ",
       colorize(session, @ansi_cyan),
+      " ",
+      colorize(persona_display, @ansi_green),
       " ",
       colorize(event_label, status_color)
     ]
@@ -755,6 +760,7 @@ defmodule SymphonyElixir.StatusDashboard do
         format_cell("AGE / TURN", @running_age_width),
         format_cell("TOKENS", @running_tokens_width),
         format_cell("SESSION", @running_session_width),
+        format_cell("PERSONA", 18),
         format_cell("EVENT", running_event_width)
       ]
       |> Enum.join(" ")
